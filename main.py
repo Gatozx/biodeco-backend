@@ -64,10 +64,17 @@ async def analizar_audio(file: UploadFile = File(...)):
         }
         
     except Exception as e:
-        return {"error": str(e)}
+        print(f"❌ ERROR CRÍTICO EN EL SERVIDOR: {str(e)}") # Esto saldrá en la terminal negra
+        return {
+            "estado": "error",
+            "nombre_archivo": file.filename,
+            "transcripcion": "No se pudo transcribir debido a un error.",
+            # AQUÍ ESTÁ EL TRUCO: Devolvemos siempre 'analisis_ia', aunque sea con el error
+            "analisis_ia": f"⚠️ Ocurrió un error procesando tu solicitud:\n\n{str(e)}\n\nPor favor revisa la terminal del backend para más detalles."
+        }
         
     finally:
-        # 5. Limpieza: Borrar el archivo de audio para no llenar el disco
+        # 5. Limpieza
         if os.path.exists(ruta_temporal):
             os.remove(ruta_temporal)
             print("🧹 Archivo temporal eliminado.")
