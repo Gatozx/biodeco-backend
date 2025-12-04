@@ -155,3 +155,5 @@ def generar_reporte_clinico(texto_transcrito):
         print(f"❌ Error en DeepSeek: {str(e)}")
         return "Error generando el reporte."
     
+
+    # ACTUALIZACION FORZADA V3 - SOLICITUD DE JSON
