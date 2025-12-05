@@ -3,6 +3,14 @@ import shutil
 from fastapi import FastAPI, UploadFile, File
 from servicios_ia import transcribir_sesion, generar_reporte_clinico
 from fastapi.middleware.cors import CORSMiddleware # <--- IMPORTAR ESTO
+from sqlalchemy.orm import Session
+from fastapi import Depends
+import models
+from database import engine, get_db
+import json # Lo necesitaremos para convertir la lista de recomendaciones a string
+
+# Esto crea las tablas en la base de datos automáticamente al iniciar
+models.Base.metadata.create_all(bind=engine)
 
 # Creamos la APP (El servidor)
 app = FastAPI(
@@ -27,8 +35,8 @@ os.makedirs("temp_uploads", exist_ok=True)
 def home():
     return {"mensaje": "El servidor de Biodecodificación está ACTIVO 🟢"}
 
-@app.post("/analizar-sesion/")
-async def analizar_audio(file: UploadFile = File(...)):
+@app.post("/analyze_audio")
+async def analyze_audio(file: UploadFile = File(...), db: Session = Depends(get_db)): # <--- OJO: Agregamos db aquí
     """
     Endpoint principal:
     1. Recibe el archivo de audio de la App.
@@ -54,7 +62,38 @@ async def analizar_audio(file: UploadFile = File(...)):
 
         # 3. Analizar (Usando tu función importada)
         reporte = generar_reporte_clinico(texto_transcrito)
-        
+
+    # ==========================================
+        # === INICIO DEL CÓDIGO NUEVO DE BASE DE DATOS ===
+        # ==========================================
+        try:
+            # Convertimos la lista de recomendaciones a texto para guardarla
+            recomendaciones_str = json.dumps(reporte.get("recomendaciones", []))
+
+            nuevo_reporte = models.Reporte(
+                motivo_consulta=reporte.get("motivo_consulta"),
+                emocion_base=reporte.get("emocion_base"),
+                organo_afectado=reporte.get("organo_afectado"),
+                conflicto_biologico=reporte.get("conflicto_biologico"),
+                diagnostico_tecnico=reporte.get("diagnostico_tecnico"),
+                recomendaciones=recomendaciones_str,
+                resumen_sesion=reporte.get("resumen_sesion")
+            )
+
+            db.add(nuevo_reporte)
+            db.commit()
+            db.refresh(nuevo_reporte)
+            print(f"✅ Reporte guardado en DB con ID: {nuevo_reporte.id}")
+            
+            # Opcional: Agregamos el ID al reporte que devolvemos al frontend
+            reporte["id_db"] = nuevo_reporte.id
+            
+        except Exception as e_db:
+            print(f"⚠️ Error guardando en Base de Datos (pero el análisis sí funcionó): {e_db}")
+        # ==========================================
+        # === FIN DEL CÓDIGO NUEVO ===
+        # ==========================================
+    
         # 4. Devolver respuesta
         return {
             "estado": "exito",
@@ -78,3 +117,30 @@ async def analizar_audio(file: UploadFile = File(...)):
         if os.path.exists(ruta_temporal):
             os.remove(ruta_temporal)
             print("🧹 Archivo temporal eliminado.")
+
+ # --- ENDPOINT NUEVO PARA LEER HISTORIAL ---           
+@app.get("/historial")
+def leer_historial(db: Session = Depends(get_db)):
+    # Obtiene todos los reportes, ordenados del más reciente al más antiguo
+    reportes = db.query(models.Reporte).order_by(models.Reporte.created_at.desc()).all()
+    
+    # Necesitamos convertir 'recomendaciones' de string a lista de nuevo para que el frontend no sufra
+    lista_resultado = []
+    for rep in reportes:
+        rep_dict = rep.__dict__
+        # Limpieza de SQLAlchemy
+        if "_sa_instance_state" in rep_dict:
+            del rep_dict["_sa_instance_state"]
+            
+        # Parsear el string JSON de vuelta a lista
+        try:
+            if rep.recomendaciones:
+                rep_dict["recomendaciones"] = json.loads(rep.recomendaciones)
+            else:
+                rep_dict["recomendaciones"] = []
+        except:
+            rep_dict["recomendaciones"] = []
+            
+        lista_resultado.append(rep_dict)
+
+    return lista_resultado
