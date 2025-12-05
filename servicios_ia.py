@@ -110,6 +110,8 @@ Estructura del JSON:
   "diagnostico_tecnico": "Explicación breve basada en las 5 Leyes Biológicas",
   "hallazgos_clinicos": "Tu reflexión profunda. Conexiones que la IA detectó entre eventos del pasado y el síntoma actual.",
   "oportunidades_omitidas": [
+      "SIEMPRE DEBES LLENAR ESTO. Si no hay omisiones, escribe: 'El terapeuta cubrió todos los puntos clave'.",
+      "Pista o tema ignorado 1..."
       "Lista de pistas que el terapeuta pasó por alto.",
       "Temas que el paciente mencionó y requieren indagación profunda.",
       "Preguntas clave que NO se hicieron."

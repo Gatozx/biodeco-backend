@@ -9,9 +9,9 @@ import models
 from database import engine, get_db
 import json # Lo necesitaremos para convertir la lista de recomendaciones a string
 
-# --- BLOQUE 1: REINICIO DE TABLAS (Solo por esta vez) ---
-models.Base.metadata.drop_all(bind=engine)   # <--- ESTO BORRA LO VIEJO
-models.Base.metadata.create_all(bind=engine) # <--- ESTO CREA LO NUEVO
+## --- BLOQUE 1: REINICIO DE TABLAS ---
+models.Base.metadata.drop_all(bind=engine)  # Esta línea borra la tabla vieja
+models.Base.metadata.create_all(bind=engine) # Esta crea la nueva
 # --------------------------------------------------------
 
 
@@ -66,6 +66,22 @@ async def analyze_audio(file: UploadFile = File(...), db: Session = Depends(get_
         # 3. Analizar (Usando tu función importada)
         reporte_json = generar_reporte_clinico(texto_transcrito)
 
+
+# === PARCHE DE SEGURIDAD: Convertir String a Diccionario ===
+        if isinstance(reporte_json, str):
+            print("⚠️ Alerta: La IA devolvió texto crudo. Convirtiendo a JSON...")
+            try:
+                # Limpiamos posibles etiquetas de código que pone la IA (```json ... ```)
+                json_limpio = reporte_json.replace("```json", "").replace("```", "").strip()
+                reporte_json = json.loads(json_limpio)
+            except Exception as e_json:
+                print(f"❌ Error fatal convirtiendo JSON: {e_json}")
+                # Si falla todo, creamos un diccionario de emergencia para que no explote la DB
+                reporte_json = {
+                    "motivo_consulta": "Error de formato IA",
+                    "diagnostico_tecnico": "La IA no devolvió un JSON válido.",
+                    "resumen_sesion": str(reporte_json) # Guardamos lo que haya mandado
+                }
     # ==========================================
         # === INICIO DEL CÓDIGO NUEVO DE BASE DE DATOS ===
         # ==========================================
