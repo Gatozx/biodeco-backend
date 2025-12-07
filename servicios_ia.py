@@ -15,14 +15,16 @@ client = OpenAI(
 # En servicios_ia.py
 
 def transcribir_sesion(ruta_audio):
-    print(f"🎧 Transcribiendo audio con Replicate (Modelo Oficial)...")
+    print(f"🎧 Transcribiendo audio con Replicate (Whisper Large-v3)...")
     try:
-        # Usamos el modelo OFICIAL de OpenAI (Whisper Large v3)
-        # Es mucho más estable y robusto.
+        # ID ACTUALIZADO Y VERIFICADO (Whisper Large v3)
+        # Este es el ID correcto para el modelo oficial de OpenAI en Replicate
+        model_version = "openai/whisper:e39e354773466b955265e969568deb7da217804d8e771ea8c9cd0cef6591f8bc"
+        
         output = replicate.run(
-            "openai/whisper:4d50797290df275329f202e48c76360b3f22b08d28c196cbc54649553200524c",
+            model_version,
             input={
-                "audio": open(ruta_audio, "rb"), # OJO: Aquí se llama 'audio', no 'file'
+                "audio": open(ruta_audio, "rb"),
                 "model": "large-v3",
                 "language": "es",
                 "translate": False,
@@ -31,15 +33,11 @@ def transcribir_sesion(ruta_audio):
             }
         )
         
-        # El modelo oficial suele devolver un diccionario con el campo 'text' o 'transcription'
-        # Vamos a asegurar que obtenemos el texto sin importar el formato
+        # Procesar respuesta
         texto_final = ""
-        
         if isinstance(output, dict):
-            # A veces viene como {'text': 'Hola...'} o {'transcription': 'Hola...'}
             texto_final = output.get('transcription') or output.get('text') or str(output)
         else:
-            # Si viene directo
             texto_final = str(output)
              
         print("✅ Transcripción completada.")
@@ -47,7 +45,6 @@ def transcribir_sesion(ruta_audio):
         
     except Exception as e:
         print(f"❌ Error crítico en Whisper: {e}")
-        # Retornamos None para que el frontend sepa que falló
         return None
 
 # 3. FUNCIÓN PARA PENSAR (Supervisor Ecléctico)
