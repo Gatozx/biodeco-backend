@@ -12,36 +12,42 @@ client = OpenAI(
 )
 
 # 2. FUNCIÓN PARA ESCUCHAR (Recuperada)
+# En servicios_ia.py
+
 def transcribir_sesion(ruta_audio):
-    print(f"🎧 Transcribiendo audio con Replicate...")
+    print(f"🎧 Transcribiendo audio con Replicate (Modelo Oficial)...")
     try:
-        # Usamos el modelo exacto que tenías configurado
+        # Usamos el modelo OFICIAL de OpenAI (Whisper Large v3)
+        # Es mucho más estable y robusto.
         output = replicate.run(
-            "thomasmol/whisper-diarization:cbd15da2f8b192957cc729958361e246782398dc443e2f9d518428574329241a",
+            "openai/whisper:4d50797290df275329f202e48c76360b3f22b08d28c196cbc54649553200524c",
             input={
-                "file": open(ruta_audio, "rb"),
-                "prompt": "Diálogo terapéutico, habla hispana.",
-                "num_speakers": 2
+                "audio": open(ruta_audio, "rb"), # OJO: Aquí se llama 'audio', no 'file'
+                "model": "large-v3",
+                "language": "es",
+                "translate": False,
+                "temperature": 0,
+                "transcription": "plain text"
             }
         )
         
-        # Convertir el resultado de Replicate a texto simple
+        # El modelo oficial suele devolver un diccionario con el campo 'text' o 'transcription'
+        # Vamos a asegurar que obtenemos el texto sin importar el formato
         texto_final = ""
-        if isinstance(output, list):
-             for item in output:
-                 # Si trae segmentos con 'text', los unimos
-                 if isinstance(item, dict) and 'text' in item:
-                     texto_final += item['text'] + " "
-                 else:
-                     texto_final += str(item) + " "
+        
+        if isinstance(output, dict):
+            # A veces viene como {'text': 'Hola...'} o {'transcription': 'Hola...'}
+            texto_final = output.get('transcription') or output.get('text') or str(output)
         else:
-             texto_final = str(output)
+            # Si viene directo
+            texto_final = str(output)
              
         print("✅ Transcripción completada.")
         return texto_final.strip()
         
     except Exception as e:
         print(f"❌ Error crítico en Whisper: {e}")
+        # Retornamos None para que el frontend sepa que falló
         return None
 
 # 3. FUNCIÓN PARA PENSAR (Supervisor Ecléctico)
