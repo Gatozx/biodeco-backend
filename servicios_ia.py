@@ -25,7 +25,7 @@ def transcribir_sesion(ruta_audio):
             model_version,
             input={
                 "audio": open(ruta_audio, "rb"),
-                "model": "large-v3",
+                "model": "large-v2",
                 "language": "es",
                 "translate": False,
                 "temperature": 0,
