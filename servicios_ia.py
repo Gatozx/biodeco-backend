@@ -1,50 +1,70 @@
 import os
 import json
 import re
+import replicate
 from openai import OpenAI
 
-# Configuración del Cliente
+# 1. Configuración de Clientes
+# Asegúrate de tener las API KEYS en tu archivo .env
 client = OpenAI(
     api_key=os.environ.get("DEEPSEEK_API_KEY"), 
     base_url="https://api.deepseek.com" 
 )
 
+# 2. FUNCIÓN PARA ESCUCHAR (Recuperada)
 def transcribir_sesion(ruta_audio):
-    """
-    AQUÍ VA TU CÓDIGO DE WHISPER (REPLICATE).
-    Pégalo tal cual lo tenías antes.
-    """
-    pass 
+    print(f"🎧 Transcribiendo audio con Replicate...")
+    try:
+        # Usamos el modelo exacto que tenías configurado
+        output = replicate.run(
+            "thomasmol/whisper-diarization:cbd15da2f8b192957cc729958361e246782398dc443e2f9d518428574329241a",
+            input={
+                "file": open(ruta_audio, "rb"),
+                "prompt": "Diálogo terapéutico, habla hispana.",
+                "num_speakers": 2
+            }
+        )
+        
+        # Convertir el resultado de Replicate a texto simple
+        texto_final = ""
+        if isinstance(output, list):
+             for item in output:
+                 # Si trae segmentos con 'text', los unimos
+                 if isinstance(item, dict) and 'text' in item:
+                     texto_final += item['text'] + " "
+                 else:
+                     texto_final += str(item) + " "
+        else:
+             texto_final = str(output)
+             
+        print("✅ Transcripción completada.")
+        return texto_final.strip()
+        
+    except Exception as e:
+        print(f"❌ Error crítico en Whisper: {e}")
+        return None
 
+# 3. FUNCIÓN PARA PENSAR (Supervisor Ecléctico)
 def generar_reporte_clinico(texto_transcrito):
-    """
-    AGENTE CLINICO ECLÉCTICO (SUPERVISOR DE TERAPEUTAS)
-    Usa el Prompt del "Consultor Clínico Ecléctico".
-    """
     print("🧠 Iniciando SUPERVISOR CLÍNICO (Enfoque Ecléctico)...")
     
-    # ---------------------------------------------------------
-    # FASE 1: EXTRACCIÓN DE EVIDENCIA (Para alimentar al supervisor)
-    # ---------------------------------------------------------
-    print("🔍 Fase 1: Recopilando evidencia de la sesión...")
+    # --- FASE 1: EXTRACCIÓN ---
+    print("🔍 Fase 1: Recopilando evidencia...")
     prompt_extraccion = """
-    Actúa como un Secretario Clínico Meticuloso.
-    Lee la transcripción y extrae los siguientes datos crudos en JSON:
+    Actúa como un Secretario Clínico. Extrae datos crudos en JSON:
     {
       "paciente": {
-        "frases_creencias": ["Citas textuales donde P se define a sí mismo o al mundo"],
-        "metaforas_fisicas": ["Menciones de cuerpo/síntomas"],
-        "historia_familiar": ["Menciones a padres/abuelos/pareja"]
+        "frases_creencias": ["Citas textuales"],
+        "metaforas_fisicas": ["Menciones de síntomas"],
+        "historia_familiar": ["Menciones a familia"]
       },
       "terapeuta": {
-        "mejores_preguntas": ["Intervenciones que abrieron tema"],
-        "momentos_ignorados": ["Temas que P sacó y T no siguió"],
-        "contradicciones_no_vistas": ["Incoherencias de P que T dejó pasar"]
+        "mejores_preguntas": ["Intervenciones clave"],
+        "momentos_ignorados": ["Temas no seguidos"]
       }
     }
     Transcripción:
     """
-    
     try:
         response1 = client.chat.completions.create(
             model="deepseek-chat",
@@ -54,54 +74,44 @@ def generar_reporte_clinico(texto_transcrito):
             ],
             temperature=0.0,
         )
-        raw_extraccion = response1.choices[0].message.content
-        datos_fase_1 = _limpiar_y_parsear_json(raw_extraccion)
+        datos_fase_1 = _limpiar_y_parsear_json(response1.choices[0].message.content)
         print("✅ Fase 1 Completada.")
-        
     except Exception as e:
         print(f"❌ Error Fase 1: {e}")
         datos_fase_1 = {}
 
-    # ---------------------------------------------------------
-    # FASE 2: ANÁLISIS DEL SUPERVISOR (TU PROMPT EXACTO)
-    # ---------------------------------------------------------
+    # --- FASE 2: ANÁLISIS DEL SUPERVISOR ---
     print("❤️ Fase 2: Análisis del Consultor Ecléctico...")
-    
-    # AQUI ESTÁ TU PROMPT MAESTRO INTEGRADO
     prompt_analisis = """
-    # IDENTIDAD: Eres el "Consultor Clínico Ecléctico", una IA especializada en supervisión. Tu cliente es el TERAPEUTA.
-
-    # CONTEXTO: Analiza la transcripción y los datos extraídos.
-
-    ## OBJETIVOS DEL INFORME:
-    1. SINTETIZAR el núcleo del caso (Integrativo).
+    # IDENTIDAD: Consultor Clínico Ecléctico. Cliente: TERAPEUTA.
+    
+    ## OBJETIVOS:
+    1. SINTETIZAR el núcleo del caso (Narrativo/Sistémico).
     2. EVALUAR la intervención de T.
     3. SUGERIR líneas de acción.
 
-    ## ESTRUCTURA OBLIGATORIA DE TU RESPUESTA (Genera un texto detallado):
-
+    ## ESTRUCTURA RESPUESTA:
     ### SECCIÓN 1: SÍNTESIS DIAGNÓSTICA
-    - Tema Central: (Asunto no resuelto).
-    - Creencias Nucleares: (Frases clave del guion de vida).
-    - Conexión Simbólica: (Interpretación metafórica del síntoma, NO médica).
-    - Origen Sistémico: (Patrones familiares).
+    - Tema Central (Asunto no resuelto).
+    - Creencias Nucleares (Guion de vida).
+    - Conexión Simbólica (Metáfora del síntoma).
+    - Origen Sistémico (Patrones familiares).
 
-    ### SECCIÓN 2: ANÁLISIS DE LA INTERVENCIÓN
-    - Puntos Fuertes: (Qué hizo bien T).
-    - Puntos Ciegos / Crítica Constructiva: (Temas evitados, contradicciones no señaladas, recursos no aprovechados).
+    ### SECCIÓN 2: ANÁLISIS DE INTERVENCIÓN
+    - Puntos Fuertes.
+    - Puntos Ciegos / Crítica (Temas evitados, contradicciones).
 
-    ### SECCIÓN 3: PROPUESTAS (LÍNEAS DE INVESTIGACIÓN)
+    ### SECCIÓN 3: PROPUESTAS
     - Línea A (Profundización Emocional).
     - Línea B (Reencuadre Narrativo).
     - Línea C (Tarea Psicomágica).
 
     ### SECCIÓN 4: INSIGHT TEÓRICO
-    - Un breve dato de contexto (Apego, Gestalt, NMG, etc) para educar al terapeuta.
+    - Dato breve de contexto teórico.
 
     ---
-    DATOS PREVIOS: {datos}
+    DATOS: {datos}
     """
-    
     try:
         response2 = client.chat.completions.create(
             model="deepseek-chat",
@@ -112,62 +122,44 @@ def generar_reporte_clinico(texto_transcrito):
             temperature=0.4, 
         )
         analisis_texto_fase_2 = response2.choices[0].message.content
-        print("✅ Fase 2 Completada (Análisis Generado).")
-        
+        print("✅ Fase 2 Completada.")
     except Exception as e:
         print(f"❌ Error Fase 2: {e}")
         analisis_texto_fase_2 = "Error en análisis."
 
-    # ---------------------------------------------------------
-    # FASE 3: MAPEO A JSON (Adaptación a la App)
-    # ---------------------------------------------------------
+    # --- FASE 3: MAPEO A JSON ---
     print("📊 Fase 3: Formateando para la App...")
-    
     prompt_final = """
-    Actúa como Traductor de Datos.
-    Toma el INFORME DEL CONSULTOR (Fase 2) y vuélcalo en este JSON estricto.
-
-    MAPEO DE CAMPOS:
-    - 'motivo_consulta' -> Pon el "Tema Central".
-    - 'emocion_base' -> Pon la emoción predominante o atmósfera.
-    - 'organo_afectado' -> Pon la "Conexión Simbólica" (Metáfora del cuerpo).
-    - 'conflicto_biologico' -> Pon las "Creencias Nucleares".
-    - 'hallazgos_clinicos' -> Pon la "Síntesis Diagnóstica" completa (Sistémico + Narrativa).
-    - 'diagnostico_tecnico' -> Pon la "SECCIÓN 4: INSIGHT TEÓRICO".
-    
-    - 'oportunidades_omitidas' -> Pon TODO el contenido de la "SECCIÓN 2: ANÁLISIS DE INTERVENCIÓN" (Puntos ciegos, crítica).
-    
-    - 'recomendaciones' -> Pon las "Líneas de Investigación" (A, B y C) de la SECCIÓN 3.
-    
-    - 'resumen_sesion' -> Resumen ejecutivo breve.
-
-    INFORME A PROCESAR:
-    {analisis}
-
-    Genera solo el JSON.
+    Vuelca el INFORME (Fase 2) en este JSON estricto:
+    {{
+      "motivo_consulta": "Pon el Tema Central",
+      "emocion_base": "Emoción predominante",
+      "organo_afectado": "Pon la Conexión Simbólica",
+      "conflicto_biologico": "Pon las Creencias Nucleares",
+      "hallazgos_clinicos": "Pon la Síntesis Diagnóstica completa",
+      "diagnostico_tecnico": "Pon la SECCIÓN 4 (Insight Teórico)",
+      "oportunidades_omitidas": "Pon TODO el contenido de la SECCIÓN 2 (Análisis Intervención)",
+      "recomendaciones": "Pon las Líneas de Investigación (SECCIÓN 3)",
+      "resumen_sesion": "Resumen breve"
+    }}
+    INFORME: {analisis}
     """
-    
     try:
         response3 = client.chat.completions.create(
             model="deepseek-chat",
             messages=[
-                {"role": "system", "content": "Eres un generador de JSON estricto."},
-                {"role": "user", "content": prompt_final.format(
-                    analisis=analisis_texto_fase_2
-                )}
+                {"role": "system", "content": "Eres un generador JSON."},
+                {"role": "user", "content": prompt_final.format(analisis=analisis_texto_fase_2)}
             ],
             temperature=0.1,
             response_format={ "type": "json_object" }
         )
-        
-        raw_final = response3.choices[0].message.content
-        json_final = _limpiar_y_parsear_json(raw_final)
-        print("✅ Reporte Ecléctico Listo.")
+        json_final = _limpiar_y_parsear_json(response3.choices[0].message.content)
+        print("✅ Reporte Listo.")
         return json_final
-
     except Exception as e:
         print(f"❌ Error Fase 3: {e}")
-        return {"error": "Fallo final", "detalle": str(e)}
+        return {"error": str(e)}
 
 def _limpiar_y_parsear_json(texto):
     try:
