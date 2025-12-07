@@ -5,7 +5,7 @@ import json
 from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-
+from pydantic import BaseModel # <--- AGREGA ESTO EN TUS IMPORTS ARRIBA
 # --- TUS MÓDULOS PROPIOS ---
 # Asegúrate de que estos archivos existan y tengan las funciones
 from database import engine, get_db
@@ -163,3 +163,72 @@ def leer_historial(db: Session = Depends(get_db)):
         lista_resultado.append(rep_dict)
 
     return lista_resultado
+
+# ==========================================
+# ENDPOINT PARA TEXTO (NUEVO)
+# ==========================================
+
+# Definimos el formato del paquete que nos enviará Flutter
+class ConsultaTexto(BaseModel):
+    texto: str
+
+@app.post("/analyze_text")
+async def analyze_text(consulta: ConsultaTexto, db: Session = Depends(get_db)):
+    print(f"📝 Recibiendo consulta de texto (Longitud: {len(consulta.texto)} caracteres)")
+    
+    try:
+        # A. Analizar Directamente (Sin Whisper)
+        # Usamos el mismo cerebro que para el audio
+        reporte_json = generar_reporte_clinico(consulta.texto)
+
+        # B. Parche de Seguridad (Igual que en audio)
+        if isinstance(reporte_json, str):
+            try:
+                json_limpio = reporte_json.replace("```json", "").replace("```", "").strip()
+                reporte_json = json.loads(json_limpio)
+            except:
+                reporte_json = {
+                    "motivo_consulta": "Texto directo",
+                    "diagnostico_tecnico": "Error de formato JSON en texto.",
+                    "resumen_sesion": str(reporte_json),
+                    "recomendaciones": [],
+                    "oportunidades_omitidas": []
+                }
+
+        # C. Guardar en Base de Datos (Igual que en audio)
+        try:
+            recomendaciones_str = json.dumps(reporte_json.get("recomendaciones", []))
+            oportunidades_str = json.dumps(reporte_json.get("oportunidades_omitidas", []))
+
+            nuevo_reporte = models.Reporte(
+                motivo_consulta=reporte_json.get("motivo_consulta"),
+                emocion_base=reporte_json.get("emocion_base"),
+                organo_afectado=reporte_json.get("organo_afectado"),
+                conflicto_biologico=reporte_json.get("conflicto_biologico"),
+                diagnostico_tecnico=reporte_json.get("diagnostico_tecnico"),
+                hallazgos_clinicos=reporte_json.get("hallazgos_clinicos", "Análisis de texto directo."),
+                oportunidades_omitidas=oportunidades_str,
+                recomendaciones=recomendaciones_str,
+                resumen_sesion=reporte_json.get("resumen_sesion")
+            )
+
+            db.add(nuevo_reporte)
+            db.commit()
+            db.refresh(nuevo_reporte)
+            
+            # Agregamos ID para el frontend
+            reporte_json["id"] = nuevo_reporte.id
+            
+        except Exception as e_db:
+            print(f"⚠️ Error guardando texto en DB: {e_db}")
+
+        # D. Devolver respuesta
+        return {
+            "estado": "exito",
+            "tipo": "texto",
+            "analisis_ia": reporte_json 
+        }
+
+    except Exception as e:
+        print(f"❌ Error en endpoint de texto: {str(e)}")
+        return {"error": str(e)}
