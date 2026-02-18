@@ -14,7 +14,11 @@ if SQLALCHEMY_DATABASE_URL and SQLALCHEMY_DATABASE_URL.startswith("postgres://")
 if not SQLALCHEMY_DATABASE_URL:
     SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
+engine_kwargs = {}
+if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
+
+engine = create_engine(SQLALCHEMY_DATABASE_URL, **engine_kwargs)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
