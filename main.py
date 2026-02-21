@@ -5,12 +5,12 @@ import json
 from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from pydantic import BaseModel # <--- AGREGA ESTO EN TUS IMPORTS ARRIBA
+from pydantic import BaseModel, Field # <--- AGREGA ESTO EN TUS IMPORTS ARRIBA
 # --- TUS MÓDULOS PROPIOS ---
 # Asegúrate de que estos archivos existan y tengan las funciones
 from database import engine, get_db
 import models
-from servicios_ia import transcribir_sesion, generar_reporte_clinico
+from servicios_ia import transcribir_sesion, generar_reporte_clinico, generar_plan_asistente_mentor
 
 # ==========================================
 # 1. CONFIGURACIÓN DE BASE DE DATOS
@@ -232,3 +232,24 @@ async def analyze_text(consulta: ConsultaTexto, db: Session = Depends(get_db)):
     except Exception as e:
         print(f"❌ Error en endpoint de texto: {str(e)}")
         return {"error": str(e)}
+
+class PlanAsistenteRequest(BaseModel):
+    descripcion: str
+    contexto: dict = Field(default_factory=dict)
+
+
+@app.post("/design_assistant")
+async def design_assistant(payload: PlanAsistenteRequest):
+    print("🚀 Diseñando asistente-mentor para terapeuta...")
+
+    datos_terapeuta = {
+        "descripcion": payload.descripcion,
+        "contexto": payload.contexto,
+    }
+
+    plan = generar_plan_asistente_mentor(datos_terapeuta)
+
+    if not plan or plan.get("error"):
+        raise HTTPException(status_code=502, detail=plan.get("error", "No se pudo generar el plan"))
+
+    return {"estado": "exito", "plan": plan}

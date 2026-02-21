@@ -164,6 +164,73 @@ def generar_reporte_clinico(texto_transcrito):
         print(f"❌ Error Fase 3: {e}")
         return {"error": str(e)}
 
+
+def generar_plan_asistente_mentor(datos_terapeuta):
+    print("🧭 Generando plan de Asistente + Mentor para terapeuta...")
+    prompt = """
+    Diseña un plan accionable para un asistente de IA para terapeutas.
+
+    OBJETIVO:
+    - Debe funcionar como asistente operativo (prospectos, recordatorios, seguimiento).
+    - Debe ayudar a crear contenido para redes y educación.
+    - Debe actuar como mentor del terapeuta, mejorando su criterio sesión a sesión.
+
+    REGLAS:
+    - Enfatiza confidencialidad y consentimiento informado.
+    - No inventes diagnósticos médicos.
+    - Entrega respuestas concretas y accionables.
+
+    Devuelve SOLO JSON con esta estructura:
+    {
+      "vision_producto": "string",
+      "modulos_priorizados": [
+        {
+          "nombre": "string",
+          "problema_que_resuelve": "string",
+          "mvp_en_2_semanas": ["string"],
+          "kpi": "string"
+        }
+      ],
+      "flujo_terapeuta_asistente": ["string"],
+      "protocolo_mentor": {
+        "antes_sesion": ["string"],
+        "durante_sesion": ["string"],
+        "despues_sesion": ["string"]
+      },
+      "motor_contenido": {
+        "pilares": ["string"],
+        "cadencia_semanal": ["string"],
+        "ideas_iniciales": ["string"]
+      },
+      "riesgos_y_mitigaciones": ["string"],
+      "primeros_30_dias": ["string"]
+    }
+
+    CONTEXTO TERAPEUTA:
+    {datos}
+    """
+
+    try:
+        response = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Eres un arquitecto de producto para asistentes clínicos con foco ético.",
+                },
+                {
+                    "role": "user",
+                    "content": prompt.format(datos=json.dumps(datos_terapeuta, ensure_ascii=False)),
+                },
+            ],
+            temperature=0.3,
+            response_format={"type": "json_object"},
+        )
+        return _limpiar_y_parsear_json(response.choices[0].message.content)
+    except Exception as e:
+        print(f"❌ Error generando plan asistente-mentor: {e}")
+        return {"error": str(e)}
+
 def _limpiar_y_parsear_json(texto):
     try:
         texto = re.sub(r'```json\s*|\s*```', '', texto).strip()
